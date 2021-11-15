@@ -1,0 +1,122 @@
+
+amazon=# insert into prodotti values ('1','ps4','giochi',300,2);
+INSERT 0 1
+amazon=# insert into clienti values ('1','marco la grasta','123456789abcdefg',50);
+INSERT 0 1
+amazon=# insert into magazzini values ('1','magazzino 1','foggia via casa mia');
+INSERT 0 1
+amazon=# insert into quantita values ('1','1',100);
+INSERT 0 1
+amazon=# insert into conto values (0);
+INSERT 0 1
+
+amazon=# create table ordini(
+amazon(# idordine serial primary key,
+amazon(# idcliente varchar(5) references clienti(idcliente),
+amazon(# idprodotto varchar(5) references prodotti(idprodotto),
+amazon(# idpmagazzino varchar(5) references magazzini(idmagazzino),
+amazon(# stato varchar(50),
+amazon(# ultimoagg date);
+CREATE TABLE
+
+
+
+amazon=# insert into conto values (1,0);
+INSERT 0 1
+amazon=# select * from conto;
+ saldo | idsaldo
+-------+---------
+     1 |       0
+(1 riga)
+
+
+
+-- CREAZIONE FUNZIONE CHE DOPO OGNI NUOVO PAGAMENTO AGGIUNGE L IMPORTO DI ESSO ,SOTTRAENDO UN EVENTUALE BUONO, AL CONTO AMAZON e AZZERANDO IL BUONO DEL CLIENTE SE USATO--
+
+create function pagamenti() returns trigger
+language plpgsql as $pagato$
+declare buono1 integer;
+begin
+buono1 := (select clienti.buono from clienti where clienti.idcliente=new.idcliente);
+if buono1>0 and new.importo>=buono1 then
+new.importo:=new.importo-buono1;
+update clienti set clienti.buono=0 where clienti.idcliente=new.idcliente;
+end if; 
+update conto set saldo=saldo+new.importo where idsaldo=0;
+return new;
+end;
+$pagato$;
+
+create trigger ins_pagamento after insert on pagamenti
+for each row execute procedure pagamenti();
+
+amazon=# insert into pagamenti values ('2','1','1',400);
+INSERT 0 1
+
+amazon=# select * from conto;  --il prezzo del prodotto è 400 e il cliente aveva un buono di 50, saldo 350--
+ saldo | idsaldo
+-------+---------
+   350 |       0
+(1 riga)
+
+
+-- CREAZIONE FUNZIONE INSERIMENTO AUTOMATICO DI UN NUOVO ORDINE NELLA TABELLA ORDINI DOPO OGNI NUOVO PAGAMENTO ANDATO A BUON FINE 
+   CON AGGIORNAMENTO DATA CORRENTE E DIMINUZINE DELLA QUANTITà DEL PRODOTTO IN MAGAZZINO --
+
+amazon=# create function ordini() returns trigger
+amazon-# language plpgsql as $ordinato$
+amazon$# declare idmag varchar;
+amazon$# begin
+amazon$# idmag :=(select quantita.idmagazzino from quantita,prodotti where quantita.idprodotto =new.idprodotto);
+amazon$# insert into ordini values (default,new.idcliente,new.idprodotto,idmag,'ordine ricevuto',current_date);
+amazon$# update quantita set npezzi=npezzi-1 where quantita.idprodotto=new.idprodotto;
+amazon$# return new;
+amazon$# end;
+amazon$# $ordinato$;
+CREATE FUNCTION
+
+amazon=# create trigger ins_ordine after insert on pagamenti
+amazon-# for each row execute procedure ordini();
+CREATE TRIGGER
+
+amazon=# insert into pagamenti values ('1','1','1',400);                                 --inserimento nuovo pagamento--
+INSERT 0 1
+
+amazon=# select * from ordini;
+ idordine | idcliente | idprodotto | idpmagazzino |      stato      | ultimoagg          --è stato creato un nuovo ordine--
+----------+-----------+------------+--------------+-----------------+------------
+        1 | 1         | 1          | 1            | ordine ricevuto | 2020-07-16
+(1 riga)
+
+
+amazon=# select * from quantita;                                                          --npezzi diminuiti,erano 100--                              
+ idmagazzino | idprodotto | npezzi
+-------------+------------+--------
+ 1           | 1          |     99
+(1 riga)
+
+
+
+-- CRAZIONE PROCEDURA PER VERIFICARE SE ,PRIMA DELL INSERIMENTO DI UN NUOVO PAGAMENTO, IL PRODOTTO è EFFETTIVAMENTE DISPONIBILE  
+   E IN CASO CONTRARIO NON PERMETTERE IL PAGAMENTO --
+
+amazon=# create function disponibile() returns trigger
+amazon-# language plpgsql as $disponibile$
+amazon$# declare numpezzi integer;
+amazon$# begin
+amazon$# numpezzi:=(select quantita.npezzi from quantita,prodotti where quantita.idprodotto=new.idprodotto);
+amazon$# if numpezzi<=0 then
+amazon$# raise exception $$prodotto non disponibile$$;
+amazon$# end if;
+amazon$# return new;
+amazon$# end;
+amazon$# $disponibile$;
+CREATE FUNCTION
+
+amazon=# create trigger dispo before insert on pagamenti
+amazon-# for each row execute procedure disponibile();
+CREATE TRIGGER
+
+amazon=# insert into pagamenti values ('1','1','1',400);
+ERRORE:  prodotto non disponibile
+CONTESTO: funzione PL/pgSQL disponibile() riga 6 a RAISE

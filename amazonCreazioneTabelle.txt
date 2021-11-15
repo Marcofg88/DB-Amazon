@@ -1,0 +1,48 @@
+insert into postgres=# create database amazon;
+CREATE DATABASE
+postgres=# \c amazon;
+                              ^
+amazon=# create table prodotti (
+amazon(# idprodotto varchar(5) primary key,
+amazon(# nome varchar(50) not null,
+amazon(# categoria varchar(50) not null,
+amazon(# prezzo integer not null check (prezzo>0),
+amazon(# ntotale integer check (ntotale >=0));
+CREATE TABLE
+
+amazon=# create table clienti(
+amazon(# idcliente varchar(5) primary key,
+amazon(# nome varchar(50) not null,
+amazon(# ncarta varchar(16) unique,
+amazon(# buono integer);
+CREATE TABLE
+amazon=# create table magazzini(
+amazon(# idmagazzino varchar(5) primary key,
+amazon(# nome varchar(50),
+amazon(# indirizzo varchar(50) not null);
+CREATE TABLE
+
+amazon=# create table quantita(
+amazon(# idcliente varchar(5) references clienti(idcliente),
+amazon(# idprodotto varchar(5) references prodotti(idprodotto),
+amazon(# npezzi integer);
+CREATE TABLE
+
+amazon=# create table pagamenti(
+amazon(# idpagamento varchar(5) primary key,
+amazon(# idprodotto varchar(5) references prodotti(idprodotto),
+amazon(# idcliente varchar(5) references clienti(idcliente),
+amazon(# importo integer not null check (importo>0));
+CREATE TABLE
+
+create table ordini(
+idordine serial primary key,
+idcliente varchar(5) references clienti(idcliente),
+idprodotto varchar(5) references prodotti(idprodotto),
+idpmagazzino varchar(5) references magazzini(idmagazzino),
+stato varchar(50),
+ultimoagg date);
+CREATE TABLE
+
+amazon=# create table conto ( saldo integer, idsaldo integer);
+CREATE TABLE
